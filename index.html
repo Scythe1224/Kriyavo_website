@@ -871,51 +871,49 @@ document.addEventListener('keydown', function(e){
   if(e.key==='Escape') closeContact();
 });
 
-/* Lead email configuration — connect your Gmail account through EmailJS.
-   Replace these values after creating an EmailJS service/template.
-   The template should use: {{name}}, {{email}}, {{company}}, {{industry}}, {{phone}}, {{need}}, {{message}}, {{to_email}}, {{subject}}
-*/
+/* Kriyavo contact form — Google Apps Script email endpoint. */
 const LEAD_EMAIL_CONFIG = {
-  publicKey: 'YOUR_EMAILJS_PUBLIC_KEY',
-  serviceId: 'YOUR_EMAILJS_SERVICE_ID',
-  templateId: 'YOUR_EMAILJS_TEMPLATE_ID',
-  toEmail: 'YOUR_RECEIVING_EMAIL@example.com'
+  endpoint: 'https://script.google.com/macros/s/AKfycbyy6UIkFvL4dzgKXw73Y46u3yFawsFFBZaJQoiMIIulaK2PHBCHQHh65-p-j9YB0uNR/exec'
 };
-if(window.emailjs && LEAD_EMAIL_CONFIG.publicKey !== 'YOUR_EMAILJS_PUBLIC_KEY'){
-  emailjs.init({publicKey: LEAD_EMAIL_CONFIG.publicKey});
-}
 
 document.getElementById('leadForm').addEventListener('submit', async function(e){
   e.preventDefault();
   const form=this, d=new FormData(form), status=document.getElementById('formStatus'), btn=document.getElementById('leadSubmit');
   const phone=((d.get('countryCode')||'')+' '+(d.get('phone')||'')).trim();
-  const params={
-    name:d.get('name'), email:d.get('email'), company:d.get('company'), industry:d.get('industry'), phone:phone, need:d.get('need'),
-    message:d.get('msg'), to_email:LEAD_EMAIL_CONFIG.toEmail,
-    subject:'New Kriyavo enquiry — '+d.get('need')
-  };
+  const payload = new URLSearchParams({
+    name: String(d.get('name') || '').trim(),
+    email: String(d.get('email') || '').trim(),
+    company: String(d.get('company') || '').trim(),
+    industry: String(d.get('industry') || '').trim(),
+    mobile: phone,
+    service: String(d.get('need') || '').trim(),
+    message: String(d.get('msg') || '').trim(),
+    website: ''
+  });
+
   status.className='form-status';
   status.textContent='';
-  btn.disabled=true; btn.textContent='Sending…';
-  try{
-    if(window.emailjs && LEAD_EMAIL_CONFIG.publicKey !== 'YOUR_EMAILJS_PUBLIC_KEY'){
-      await emailjs.send(LEAD_EMAIL_CONFIG.serviceId,LEAD_EMAIL_CONFIG.templateId,params);
-      status.classList.add('ok');
-      status.textContent='Thanks — your enquiry has been sent. We’ll get back to you soon.';
-      form.reset();
-    }else{
-      const subject=encodeURIComponent(params.subject);
-      const body=encodeURIComponent('Name: '+params.name+'\nEmail: '+params.email+'\nCompany: '+(params.company||'Not provided')+'\nIndustry: '+(params.industry||'Not provided')+'\nContact No: '+params.phone+'\nRequirement: '+params.need+'\n\nMessage: '+params.message);
-      window.location.href='mailto:'+LEAD_EMAIL_CONFIG.toEmail+'?subject='+subject+'&body='+body;
-      status.classList.add('ok');
-      status.textContent='Your email app has been opened with the enquiry prepared.';
-    }
-  }catch(err){
-    console.error('Lead submission failed:',err);
+  btn.disabled=true;
+  btn.textContent='Sending…';
+  try {
+    // Apps Script's cross-origin response is opaque from GitHub Pages. no-cors
+    // allows the browser to submit the form without exposing private credentials.
+    await fetch(LEAD_EMAIL_CONFIG.endpoint, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: payload.toString()
+    });
+    status.classList.add('ok');
+    status.textContent='Your inquiry has been submitted. Thank you — our team will get back to you soon.';
+    form.reset();
+  } catch(err) {
+    console.error('Lead submission failed:', err);
     status.classList.add('error');
-    status.textContent='We could not send the enquiry right now. Please email us directly at hello@kriyavo.com.';
-  }finally{
-    btn.disabled=false; btn.textContent='Send Message';
+    status.textContent='We could not submit your inquiry. Please try again or email reliablesoft4@gmail.com directly.';
+  } finally {
+    btn.disabled=false;
+    btn.textContent='Send Message';
   }
 });
 
